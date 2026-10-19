@@ -18,7 +18,7 @@ compatible machines. The master uses the same
 API 2.0 work request, assignment, acknowledgement, complete result and proof
 routes. It remains responsible for the whole benchmark after confirmed handover.
 Members implement internal transport, scheduling, recovery and output aggregation.
-The pool's [member master contract](https://github.com/Daniel-T-S-Adams/community-pool/blob/main/docs/MEMBER_MASTER.md)
+The pool's [member master contract](https://github.com/tig-foundation/tig-community-pool/blob/main/docs/MEMBER_MASTER.md)
 specifies that integration. Paired pool tests exercise a simulated master
 combining helper outputs, recovering missing work after restart, and submitting
 one complete result and sampled proofs.
@@ -139,4 +139,4 @@ lifetime again whenever the algorithm, workload or hardware changes. What has
 been exercised on mainnet and the open checks, including GPU execution,
 interruption during live compute and evidence retention through settlement,
 are listed in the pool repository's
-[ROADMAP.md](https://github.com/Daniel-T-S-Adams/community-pool/blob/main/docs/ROADMAP.md).
+[ROADMAP.md](https://github.com/tig-foundation/tig-community-pool/blob/main/docs/ROADMAP.md).

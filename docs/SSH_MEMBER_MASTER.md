@@ -121,4 +121,4 @@ tests are simulated.
 The configured verification compute type does not certify a physical cloud
 instance type. What this mode has completed on real hosts and on mainnet, and
 what remains open, is recorded in the pool repository's
-[ROADMAP.md](https://github.com/Daniel-T-S-Adams/community-pool/blob/main/docs/ROADMAP.md).
+[ROADMAP.md](https://github.com/tig-foundation/tig-community-pool/blob/main/docs/ROADMAP.md).
