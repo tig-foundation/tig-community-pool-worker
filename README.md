@@ -1,12 +1,12 @@
 # Community Pool member worker
 
 The reference worker for members of
-[Community Pool](https://github.com/Daniel-T-S-Adams/community-pool), a member-run
+[Community Pool](https://github.com/tig-foundation/tig-community-pool), a member-run
 pool for The Innovation Game (TIG). It takes one whole benchmark at a time
 from the pool, computes every nonce with the official pinned challenge
 runtime, keeps durable evidence of every output, and returns the complete
 result and the sampled proofs through the pool's
-[member API](https://github.com/Daniel-T-S-Adams/community-pool/blob/main/docs/MEMBER_API.md).
+[member API](https://github.com/tig-foundation/tig-community-pool/blob/main/docs/MEMBER_API.md).
 It can also act as a member master that spreads one benchmark across
 compatible machines over SSH.
 
@@ -35,7 +35,7 @@ Members may use the SSH member master mode, or their own compatible master, to
 coordinate several machines and submit one complete benchmark through the
 pool's API. Every machine used for an assignment must match the verification
 compute type, architecture, algorithm binary and pinned runtime. The pool's
-[member master contract](https://github.com/Daniel-T-S-Adams/community-pool/blob/main/docs/MEMBER_MASTER.md)
+[member master contract](https://github.com/tig-foundation/tig-community-pool/blob/main/docs/MEMBER_MASTER.md)
 specifies the integration.
 
 ## Development

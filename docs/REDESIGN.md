@@ -49,6 +49,6 @@ challenge containers.
 
 What has been exercised on real hosts and on mainnet, and what remains open,
 is recorded in the pool repository's
-[ROADMAP.md](https://github.com/Daniel-T-S-Adams/community-pool/blob/main/docs/ROADMAP.md).
+[ROADMAP.md](https://github.com/tig-foundation/tig-community-pool/blob/main/docs/ROADMAP.md).
 Challenge viability depends on the algorithm, workload and hardware and must
 be measured again when any of them changes.
