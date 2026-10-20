@@ -72,7 +72,7 @@ class ArtifactTests(unittest.TestCase):
                 payload = archive(arch)
                 value = {**assignment(), 'compute_type': compute, 'binary_url': MEDIA,
                          'binary_sha256': hashlib.sha256(payload).hexdigest()}
-                runtime = DockerRuntime(directory, {'c001': IMAGE})
+                runtime = DockerRuntime(directory)
                 runtime.validate(value, {'resource': 'CPU', 'compute_type': compute})
                 with patch('worker_v2.runtime.build_opener') as opener, \
                         patch.object(runtime, '_inspect', return_value=None), patch.object(runtime, '_run') as run:
@@ -96,7 +96,7 @@ class ArtifactTests(unittest.TestCase):
             with self.subTest(sha=hashlib.sha256(payload).hexdigest()), tempfile.TemporaryDirectory() as directory, \
                     patch('platform.machine', return_value='x86_64'):
                 value = {**assignment(), 'binary_url': MEDIA, 'binary_sha256': hashlib.sha256(payload).hexdigest()}
-                runtime = DockerRuntime(directory, {'c001': IMAGE})
+                runtime = DockerRuntime(directory)
                 with patch('worker_v2.runtime.build_opener') as opener, patch.object(runtime, '_run') as run:
                     opener.return_value.open.return_value = io.BytesIO(payload)
                     with self.assertRaises(StateError):
@@ -114,7 +114,7 @@ class ArtifactTests(unittest.TestCase):
         payload = buffer.getvalue()
         digest = hashlib.sha256(payload).hexdigest()
         with tempfile.TemporaryDirectory() as directory, patch('platform.machine', return_value='x86_64'):
-            runtime = DockerRuntime(directory, {'c001': IMAGE})
+            runtime = DockerRuntime(directory)
             with patch('worker_v2.runtime.build_opener') as opener, \
                     patch.object(runtime, '_inspect', return_value=None), patch.object(runtime, '_run'):
                 opener.return_value.open.side_effect = lambda *args, **kwargs: io.BytesIO(payload)

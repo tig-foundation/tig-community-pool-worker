@@ -24,12 +24,12 @@ CPU_TYPES = ARM_TYPES | {"aws_t3", "aws_t3a", "aws_c7i", "aws_c7a", "aws_m7i", "
 
 
 class DockerRuntime:
-    def __init__(self, directory, images, *, binary_hosts=DEFAULT_BINARY_HOSTS,
+    def __init__(self, directory, *, binary_hosts=DEFAULT_BINARY_HOSTS,
                  nonce_timeout=1800, resource_limits=None, command=subprocess.run):
         self.limits = RuntimeLimits.parse(resource_limits)
         self.directory = Path(directory).resolve() / "runtime"
         self.directory.mkdir(parents=True, exist_ok=True)
-        self.images, self.binary_hosts, self.nonce_timeout, self.command = images, set(binary_hosts), nonce_timeout, command
+        self.binary_hosts, self.nonce_timeout, self.command = set(binary_hosts), nonce_timeout, command
         machine = platform.machine().lower()
         self.arch = {"x86_64": "amd64", "amd64": "amd64", "aarch64": "arm64", "arm64": "arm64"}.get(machine)
         if self.arch is None:
@@ -46,11 +46,6 @@ class DockerRuntime:
             info = self._run(["docker", "info", "--format", "{{json .CgroupDriver}} {{json .CgroupVersion}}"])
             if info.stdout.strip() != '"systemd" "2"':
                 raise StateError("shared worker limits require Docker with systemd and cgroup v2")
-
-    def validate_release(self, release):
-        images = release.get('runtime_images')
-        if not isinstance(images, dict) or images != self.images:
-            raise StateError('The pool runtime changed; drain existing work and update this worker and its helpers before requesting new work')
 
     def validate(self, assignment, offer):
         settings = assignment.get("settings", {})
@@ -75,8 +70,10 @@ class DockerRuntime:
             raise StateError("assignment differs from the offered resource")
         if (compute in ARM_TYPES) != (self.arch == "arm64"):
             raise StateError("verification compute type does not match this machine architecture")
-        image = self.images.get(challenge, "")
-        if not re.fullmatch(r"ghcr\.io/tig-foundation/tig-monorepo/[a-z_]+/runtime@sha256:[0-9a-f]{64}", image):
+        # The pool pins the official image for the assignment's challenge; this
+        # machine pulls exactly that content digest and runs nothing else.
+        image = assignment.get("runtime_image", "")
+        if not isinstance(image, str) or not re.fullmatch(r"ghcr\.io/tig-foundation/tig-monorepo/[a-z_]+/runtime@sha256:[0-9a-f]{64}", image):
             raise StateError("challenge runtime must be an explicitly pinned official image digest")
         check_url(assignment.get("binary_url", ""), self.binary_hosts)
         if not re.fullmatch(r"[0-9a-f]{64}", assignment.get("binary_sha256", "")):
@@ -154,7 +151,7 @@ class DockerRuntime:
             for entry, source in wanted.items():
                 shutil.copyfile(source, targets[entry])
             marker.write_text(assignment["binary_sha256"])
-        image = self.images[assignment["settings"]["challenge_id"]]
+        image = assignment["runtime_image"]
         existing = self._inspect(name)
         if existing:
             labels = existing["Config"].get("Labels", {})

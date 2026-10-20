@@ -50,8 +50,7 @@ class Remote(Local):
 
 def helper_config(directory):
     return {"master_id": "member-master-one", "resource": "CPU", "compute_type": "aws_c7a",
-            "workers": 2, "runtime_images": {"c001": "pinned-fixture-runtime"},
-            "data_directory": str(directory), "nonce_timeout_seconds": 1800}
+            "workers": 2, "data_directory": str(directory), "nonce_timeout_seconds": 1800}
 
 
 def connection_config():
@@ -217,11 +216,11 @@ class HelperTests(unittest.TestCase):
 
     def test_handshake_rejects_incompatible_architecture_type_runtime_and_master(self):
         hello = self.helper.hello()
-        expected = dict(resource="CPU", compute_type="aws_c7a", workers=2,
-                        images=self.config["runtime_images"], master_id=self.config["master_id"])
+        expected = dict(resource="CPU", compute_type="aws_c7a", workers=2, master_id=self.config["master_id"])
         check_hello(hello, **expected)
-        for key, value in (("arch", "arm64"), ("compute_type", "aws_c7g"),
-                           ("runtime_images", {}), ("master_id", "other"), ("workers", 1)):
+        self.assertNotIn("runtime_images", hello)  # images travel inside each assignment now
+        for key, value in (("arch", "arm64"), ("compute_type", "aws_c7g"), ("wire_version", 1),
+                           ("nonce_timeout_seconds", 60), ("master_id", "other"), ("workers", 1)):
             with self.subTest(key=key):
                 with self.assertRaises(StateError):
                     check_hello({**hello, key: value}, **expected)
@@ -274,7 +273,7 @@ finally: store.close()
                 return subprocess.Popen([sys.executable, "-c", stub, json.dumps(config), tests], **kwargs)
             transport = SSHTransport(connection_config(), popen=popen)
             remote = RemoteRuntime(connection_config(), master_id=config["master_id"], resource="CPU",
-                compute_type="aws_c7a", images=config["runtime_images"], nonce_timeout=3, transport=transport)
+                compute_type="aws_c7a", nonce_timeout=3, transport=transport)
             value = assignment()
             saved = {"payload": canonical(value), "digest": digest(canonical(value)),
                      "acknowledged_at": "2026-10-12T10:00:00+00:00"}

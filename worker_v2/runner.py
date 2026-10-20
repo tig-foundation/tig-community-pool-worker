@@ -14,9 +14,14 @@ TERMINAL = {"active", "verification_failed", "expired", "rejected", "cancelled"}
 
 
 class Runner:
-    def __init__(self, client, store, runtime, *, resource, compute_type, workers=1):
+    def __init__(self, client, store, runtime, *, resource, compute_type, workers=1, worker_commit=None):
         if resource not in ("CPU", "GPU") or type(workers) is not int or workers < 1:
             raise StateError("offer one CPU or GPU resource with positive worker capacity")
+        if worker_commit is not None and not isinstance(worker_commit, str):
+            raise StateError("the installed worker commit must be a string when configured")
+        # An installed worker knows which worker release it is; a custom master
+        # may leave this unset and skips the pairing check.
+        self.worker_commit = worker_commit
         expected='GPU' if compute_type=='aws_g4dn' else 'CPU' if compute_type in CPU_TYPES else None
         if expected!=resource or (getattr(runtime,'arch',None) and (compute_type in ARM_TYPES)!=(runtime.arch=='arm64')):
             raise StateError('compute type must match the offered resource and machine architecture')
@@ -25,14 +30,19 @@ class Runner:
         self.workers = workers
 
     def check_release(self, capabilities):
-        validate = getattr(self.runtime, 'validate_release', None)
+        """Before new work, an installed worker checks that the pool still pairs its release.
+
+        Runtime images are no longer compared here: the pool pins them and each
+        assignment carries its own, so a newly pinned challenge needs no update.
+        """
         expected = capabilities.get('release_digest')
-        if validate is None or expected is None:
-            return  # Custom runtimes and unconfigured API fixtures keep their contract.
+        if self.worker_commit is None or expected is None:
+            return  # Custom masters and unconfigured API fixtures keep their contract.
         release = self.client.call('GET', '/api/v2/release')
         if digest(canonical(release)) != expected:
             raise ProtocolError('The pool release changed while checking new work; retry the release check')
-        validate(release)
+        if not isinstance(release, dict) or release.get('worker', {}).get('commit') != self.worker_commit:
+            raise StateError('The pool pairs a different worker release; drain existing work and update this worker and its helpers before requesting new work')
 
     def step(self, *, drain=False):
         capabilities = self.client.capabilities()

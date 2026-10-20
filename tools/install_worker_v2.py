@@ -60,12 +60,11 @@ def validate_manifest(value):
             raise InstallError('release repository, full commit or tag is invalid')
     if type(value['worker'].get('state_version')) is not int or value['worker'].get('state_version')!=1:raise InstallError('incompatible worker evidence format')
     if not re.fullmatch(r'[0-9a-f]{64}',value['worker']['installer_sha256']):raise InstallError('recorded installer checksum required')
-    images=value['runtime_images']
-    if not isinstance(images,dict) or not images:raise InstallError('verified challenge runtime images are required')
-    for challenge,image in images.items():
-        if not re.fullmatch(r'c[0-9]+',challenge) or not re.fullmatch(
-            r'ghcr\.io/tig-foundation/tig-monorepo/[a-z_]+/runtime@sha256:[0-9a-f]{64}',image):
-            raise InstallError('runtime images must use explicit official image digests')
+    # The pool pins each challenge's official runtime image and sends it inside every
+    # assignment; the served release lists the current pins for information only.
+    if 'runtime_version' in value and (not isinstance(value['runtime_version'],str) or not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+',value['runtime_version'])):
+        raise InstallError('the TIG runtime version must be a dotted release number')
+    if 'runtime_images' in value and not isinstance(value['runtime_images'],dict):raise InstallError('pinned runtime images must be a map')
     return value
 
 
@@ -216,7 +215,7 @@ for arguments,expected in ((['remote','get-url','origin'],manifest['worker']['re
 token=root/'execution-token'
 if token.is_symlink() or stat.S_IMODE(token.stat().st_mode)&0o077:raise SystemExit('execution token file must be private')
 config=json.loads((root/'worker.json').read_text())
-if config['pool_origin']!=record['pool_origin'] or Path(config['data_directory']).resolve()!=root/'data' or config['runtime_images']!=manifest['runtime_images']:raise SystemExit('worker configuration differs from its owned installation or recorded runtimes')
+if config['pool_origin']!=record['pool_origin'] or Path(config['data_directory']).resolve()!=root/'data' or config.get('worker_commit')!=record['worker_commit']:raise SystemExit('worker configuration differs from its owned installation or recorded release')
 os.environ['POOL_V2_EXECUTION_TOKEN']=token.read_text().strip()
 os.chdir(code)
 python=str(release/'venv/bin/python')
@@ -250,7 +249,7 @@ def install(root,pool,manifest,*,resource=None,compute_type=None,workers=1,execu
         # retried explicitly without mistaking another application's files for ours.
         atomic(root/MARKER,canonical(marker)+'\n')
         config={'pool_origin':pool,'data_directory':str(root/'data'),'resource':resource,
-            'compute_type':compute_type,'workers':workers,'runtime_images':manifest['runtime_images']}
+            'compute_type':compute_type,'workers':workers,'worker_commit':manifest['worker']['commit']}
         atomic(root/'worker.json',canonical(config)+'\n');atomic(root/'execution-token',execution_token+'\n')
     with installation_lock(root),stopped_and_drained(root):
         if marker.get('worker_commit'):
@@ -260,7 +259,9 @@ def install(root,pool,manifest,*,resource=None,compute_type=None,workers=1,execu
         if config['pool_origin']!=pool or Path(config['data_directory']).resolve()!=root/'data':
             raise InstallError('existing configuration points outside its owned installation')
         target=build_release(root,manifest)
-        config['runtime_images']=manifest['runtime_images']
+        # Images arrive inside each assignment now; an older installation's copy is retired on update.
+        config.pop('runtime_images',None)
+        config['worker_commit']=manifest['worker']['commit']
         marker.update(worker_commit=manifest['worker']['commit'],pool_commit=manifest['pool']['commit'],
             release_digest=hashlib.sha256(canonical(manifest).encode()).hexdigest(),manifest=manifest)
         atomic(root/'worker.json',canonical(config)+'\n')

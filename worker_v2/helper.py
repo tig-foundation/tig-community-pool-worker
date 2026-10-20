@@ -15,7 +15,9 @@ from .runtime import DockerRuntime
 from .state import Store, StateError, digest
 
 
-WIRE_VERSION = 1
+# 2: helpers receive the pinned runtime image inside each assignment instead of
+# an install-time image map, so the hello no longer carries runtime_images.
+WIRE_VERSION = 2
 MAX_MESSAGE = 64 * 1024 * 1024
 
 
@@ -36,7 +38,6 @@ class Helper:
         return {"wire_version": WIRE_VERSION, "arch": self.runtime.arch,
                 "resource": self.config["resource"],
                 "compute_type": self.config["compute_type"], "workers": self.workers,
-                "runtime_images": self.config["runtime_images"],
                 "nonce_timeout_seconds": self.config.get("nonce_timeout_seconds", 1800),
                 "master_id": self.config["master_id"]}
 
@@ -211,7 +212,7 @@ def main(argv=None):
         fcntl.flock(process_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         store = Store(directory)
         try:
-            runtime = DockerRuntime(directory, config["runtime_images"],
+            runtime = DockerRuntime(directory,
                 binary_hosts=config.get("binary_hosts", DEFAULT_BINARY_HOSTS),
                 nonce_timeout=config.get("nonce_timeout_seconds", 1800),
                 resource_limits=config["runtime_limits"])

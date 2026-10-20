@@ -59,7 +59,7 @@ print('fixture-revision='''+name+'''')
 
     def manifest(self,worker=None):
         return {'manifest_version':1,'api_version':'2.0','pool':{'repository':installer.POOL_REPOSITORY,
-            'commit':'a'*40,'tag':'v2-pool-fixture'},'worker':worker or self.first,
+            'commit':'a'*40,'tag':'v2-pool-fixture'},'worker':worker or self.first,'runtime_version':'0.0.8',
             'runtime_images':{'c001':'ghcr.io/tig-foundation/tig-monorepo/satisfiability/runtime@sha256:'+'b'*64}}
 
     def install(self,manifest=None):
@@ -81,7 +81,9 @@ print('fixture-revision='''+name+'''')
             self.assertNotIn(self.token,result.stdout+result.stderr)
         self.assertEqual(self.git('rev-parse','HEAD'),self.second['commit'])  # Upstream advanced before install.
         config=json.loads((self.root/'worker.json').read_text())
-        self.assertEqual((config['resource'],config['workers'],config['data_directory']),('CPU',2,str(self.root/'data')))
+        self.assertEqual((config['resource'],config['workers'],config['data_directory'],config['worker_commit']),
+            ('CPU',2,str(self.root/'data'),self.first['commit']))
+        self.assertNotIn('runtime_images',config)  # the pool names the image inside each assignment
         self.assertFalse((self.root/'releases'/self.first['commit']/'code'/'execution-token').exists())
         wrapper=Path(__file__).resolve().parents[2]/'scripts/start-fresh.sh'
         started=subprocess.run(['bash',str(wrapper),str(self.root)],capture_output=True,text=True,timeout=20,
@@ -109,6 +111,7 @@ print('fixture-revision='''+name+'''')
         self.install()
         config=json.loads((self.root/'worker.json').read_text());config['workers']=3
         config['runtime_limits']={'cpu_millis':1000,'memory_mib':1280,'pids_limit':128,'cgroup_parent':'innopoolv2pilot.slice'}
+        config['runtime_images']={'c001':'an older installation copied the release images into its configuration'}
         (self.root/'worker.json').write_text(json.dumps(config))
         store=Store(self.root/'data');request=store.request({'resource':'CPU'});store.close()
         evidence=self.root/'data'/'retained-arbitration-evidence';evidence.write_text('retain through settlement')
@@ -118,6 +121,8 @@ print('fixture-revision='''+name+'''')
         installer.install(self.root,'https://pool.example',self.manifest(self.second),update=True)
         self.assertEqual(json.loads((self.root/'worker.json').read_text())['workers'],3)
         self.assertEqual(json.loads((self.root/'worker.json').read_text())['runtime_limits'],config['runtime_limits'])
+        self.assertEqual(json.loads((self.root/'worker.json').read_text())['worker_commit'],self.second['commit'])
+        self.assertNotIn('runtime_images',json.loads((self.root/'worker.json').read_text()))
         self.assertEqual((self.root/'execution-token').read_text().strip(),self.token)
         self.assertEqual(evidence.read_text(),'retain through settlement')
         self.assertTrue((self.root/'releases'/self.first['commit']).is_dir())
@@ -146,7 +151,7 @@ print('fixture-revision='''+name+'''')
     def test_interrupted_activation_fails_closed_and_an_explicit_retry_recovers(self):
         self.install()
         next_manifest=self.manifest(self.second)
-        next_manifest['runtime_images']['c001']=next_manifest['runtime_images']['c001'].replace('b'*64,'c'*64)
+        next_manifest['runtime_version']='0.0.9'
         write=installer.atomic
         def fail_marker(path,*args,**kwargs):
             if path==self.root/installer.MARKER:raise OSError('fixture lost power before activation')
@@ -186,8 +191,11 @@ print('fixture-revision='''+name+'''')
             installer.release_from_pool('https://pool.example')
         wrong=deepcopy(manifest);wrong['worker']['repository']='https://github.com/example/other-worker.git'
         with self.assertRaises(installer.InstallError):installer.validate_manifest(wrong)
-        wrong=deepcopy(manifest);wrong['runtime_images']['c001']='example:latest'
+        wrong=deepcopy(manifest);wrong['runtime_version']='latest'
         with self.assertRaises(installer.InstallError):installer.validate_manifest(wrong)
+        # The served pins are informational to the installer: a release without them, or with more, installs.
+        installer.validate_manifest({key:value for key,value in manifest.items() if key!='runtime_images'})
+        installer.validate_manifest({**manifest,'runtime_images':{**manifest['runtime_images'],'c005':'ghcr.io/tig-foundation/tig-monorepo/hypergraph/runtime@sha256:'+'c'*64}})
 
     def test_wrong_machine_type_is_rejected_before_installing_or_offering_work(self):
         from worker_v2.runner import Runner
@@ -203,7 +211,7 @@ print('fixture-revision='''+name+'''')
         from worker_v2 import __main__ as entry
         directory=self.base/'draining-data';directory.mkdir();(directory/'drain.request').write_text('requested')
         config={'pool_origin':'https://pool.example','data_directory':str(directory),'resource':'CPU',
-            'compute_type':self.compute,'workers':1,'runtime_images':self.manifest()['runtime_images']}
+            'compute_type':self.compute,'workers':1,'worker_commit':self.first['commit']}
         path=self.base/'draining.json';path.write_text(json.dumps(config))
         with patch.dict(os.environ,{'POOL_V2_EXECUTION_TOKEN':self.token}),patch.object(entry,'Runner') as runner,\
                 patch.object(entry.signal,'signal'),patch.object(entry.logging,'basicConfig'):

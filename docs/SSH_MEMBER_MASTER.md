@@ -70,7 +70,6 @@ The helper configuration is:
   "resource": "CPU",
   "compute_type": "aws_c7g",
   "workers": 2,
-  "runtime_images": {"c003": "COPY_THE_EXACT_PINNED_IMAGE_FROM_THE_MASTER"},
   "nonce_timeout_seconds": 480,
   "runtime_limits": {
     "cpu_millis": 2000,
@@ -82,9 +81,9 @@ The helper configuration is:
 ```
 
 The master and helper must use the same `master_id`, resource, verification
-compute type, complete runtime-image mapping and nonce timeout. The image
-placeholder above must be replaced with actual official images pinned by
-SHA-256. The helper's slice must match both configurations. The transport
+compute type and nonce timeout, and the same worker release (the helper
+handshake carries a wire version). Both run the official runtime image each
+assignment names. The helper's slice must match both configurations. The transport
 starts the helper inside that slice with `systemd-run --scope`.
 For older assignments whose archive URL points to the pool, configure the
 helper's `binary_hosts` with the pool API hostname plus

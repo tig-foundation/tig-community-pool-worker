@@ -28,7 +28,7 @@ class ResourceTests(unittest.TestCase):
                    {**LIMITS, "cgroup_parent": "../../system.slice"}, {**LIMITS, "cgroup_parent": None}]
         with tempfile.TemporaryDirectory() as directory:
             config = {"pool_origin": "https://pool.example", "data_directory": directory,
-                      "resource": "CPU", "compute_type": "aws_c7g", "runtime_images": {}}
+                      "resource": "CPU", "compute_type": "aws_c7g"}
             path = Path(directory) / "worker.json"
             for value in invalid:
                 with self.subTest(value=value), patch.object(entry, "Runner") as runner, \
@@ -42,9 +42,9 @@ class ResourceTests(unittest.TestCase):
     def test_container_limits_survive_recovery_and_recreate_only_owned_mismatches(self):
         with tempfile.TemporaryDirectory() as directory:
             image = "ghcr.io/tig-foundation/tig-monorepo/satisfiability/runtime@sha256:" + "a" * 64
-            runtime = DockerRuntime(directory, {"c001": image}, resource_limits=LIMITS)
+            runtime = DockerRuntime(directory, resource_limits=LIMITS)
             assignment = {"benchmark_id": "resource-test", "settings": {"algorithm_id": "c001_a001", "challenge_id": "c001"},
-                          "binary_sha256": "b" * 64, "compute_type": "aws_c7g"}
+                          "binary_sha256": "b" * 64, "compute_type": "aws_c7g", "runtime_image": image}
             root, name = runtime._paths(assignment)
             root.mkdir();(root / "c001_a001.so").write_bytes(b"fixture")
             (root / "archive.sha256").write_text(assignment["binary_sha256"])

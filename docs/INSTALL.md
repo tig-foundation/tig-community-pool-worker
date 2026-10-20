@@ -35,9 +35,10 @@ provide a member wallet private key or the pool's TIG API key.
 
 The installer verifies the pool's API version, whole-benchmark assignment unit,
 release digest and pool commit. The manifest must name the expected worker repository,
-a full worker commit, a tag resolving to that commit, compatible evidence
-format, and official challenge images pinned by digest. A moving branch is not
-an installation target. An existing destination is refused unless an explicit
+a full worker commit, a tag resolving to that commit and a compatible evidence
+format. A moving branch is not an installation target. The installer records
+the worker commit in `worker.json`; the running worker refuses new work once
+the pool pairs a different worker release. An existing destination is refused unless an explicit
 update verifies its ownership marker and checkout identity.
 
 Each installation has its own private directory:
@@ -101,9 +102,14 @@ same canonical JSON SHA-256 as `release_digest`, plus `pool_commit`.
   "api_version": "2.0",
   "pool": {"repository": "https://github.com/Daniel-T-S-Adams/community-pool.git", "commit": "<40 hex characters>", "tag": "<tested pool tag>"},
   "worker": {"repository": "https://github.com/Daniel-T-S-Adams/community-pool-worker.git", "commit": "<40 hex characters>", "tag": "<tested worker tag>", "state_version": 1, "installer_sha256": "<64 hex characters>"},
+  "runtime_version": "0.0.8",
   "runtime_images": {"c001": "ghcr.io/tig-foundation/tig-monorepo/satisfiability/runtime@sha256:<64 hex characters>"}
 }
 ```
+
+`runtime_images` is informational here: the pool pins the official image of
+each active challenge at that runtime version and names it inside every
+assignment, so a newly pinned challenge needs no reinstall.
 
 This is a schema example, not a deployable release. The pool's deployment
 record also needs the tested database migrations, application images and TIG
