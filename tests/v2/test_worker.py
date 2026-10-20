@@ -26,7 +26,8 @@ def assignment(resource="CPU"):
         "rand_hash": "0"*32, "fuel_budget": 100, "hyperparameters": None,
         "compute_type": "aws_c7a" if resource == "CPU" else "aws_g4dn",
         "binary_url": "https://mainnet-api.tig.foundation/get-binary-blob?algorithm_id=c001_a001",
-        "binary_sha256": "a"*64}
+        "binary_sha256": "a"*64,
+        "runtime_image": "ghcr.io/tig-foundation/tig-monorepo/satisfiability/runtime@sha256:"+"a"*64}
 
 
 def leaf(nonce):
@@ -243,8 +244,7 @@ class RuntimeIsolationTests(unittest.TestCase):
         value["binary_sha256"]=hashlib.sha256(archive).hexdigest()
         value["binary_url"]="https://pool.example/api/v2/artifacts/"+value["binary_sha256"]
         with tempfile.TemporaryDirectory() as directory, patch("platform.machine",return_value="x86_64"):
-            image="ghcr.io/tig-foundation/tig-monorepo/satisfiability/runtime@sha256:"+"a"*64
-            runtime=DockerRuntime(directory,{"c001":image},binary_hosts={"pool.example"})
+            runtime=DockerRuntime(directory,binary_hosts={"pool.example"})
             runtime.validate(value,{"resource":"CPU","compute_type":"aws_c7a"})
             with patch("worker_v2.runtime.build_opener") as opener,patch.object(runtime,"_inspect",return_value=None),patch.object(runtime,"_run") as run:
                 opener.return_value.open.return_value=io.BytesIO(archive)
@@ -259,12 +259,16 @@ class RuntimeIsolationTests(unittest.TestCase):
 
     def test_unpinned_image_and_foreign_container_are_rejected(self):
         with tempfile.TemporaryDirectory() as directory, patch("platform.machine", return_value="x86_64"):
-            image="ghcr.io/tig-foundation/tig-monorepo/satisfiability/runtime@sha256:"+"a"*64
-            runtime = DockerRuntime(directory, {"c001":image})
+            runtime = DockerRuntime(directory)
             value = assignment()
             runtime.validate(value, {"resource":"CPU", "compute_type":"aws_c7a"})
-            runtime.images["c001"] = "ghcr.io/tig-foundation/tig-monorepo/satisfiability/runtime:latest"
-            with self.assertRaises(StateError): runtime.validate(value, {"resource":"CPU", "compute_type":"aws_c7a"})
+            # The pool names the image inside the assignment; only an official content digest is run.
+            for image in ("ghcr.io/tig-foundation/tig-monorepo/satisfiability/runtime:latest",
+                          "docker.io/tig-foundation/tig-monorepo/satisfiability/runtime@sha256:"+"a"*64, None, 7):
+                with self.subTest(image=image), self.assertRaises(StateError):
+                    runtime.validate({**value, "runtime_image": image}, {"resource":"CPU", "compute_type":"aws_c7a"})
+            missing = dict(value); del missing["runtime_image"]
+            with self.assertRaises(StateError): runtime.validate(missing, {"resource":"CPU", "compute_type":"aws_c7a"})
             with patch.object(runtime, "_inspect", return_value={"Config":{"Labels":{"innopool.v2.owner":"another"}}}), patch.object(runtime,"_run") as run:
                 with self.assertRaises(StateError): runtime.release(value)
                 run.assert_not_called()

@@ -170,14 +170,13 @@ class SSHTransport:
             stream.close()
 
 
-def check_hello(hello, *, resource, compute_type, workers, images, master_id, nonce_timeout=1800):
+def check_hello(hello, *, resource, compute_type, workers, master_id, nonce_timeout=1800):
     from .runtime import ARM_TYPES
     expected_arch = "arm64" if compute_type in ARM_TYPES else "amd64"
     expected = {"wire_version": WIRE_VERSION, "arch": expected_arch,
                 "resource": resource, "compute_type": compute_type,
-                "runtime_images": images, "master_id": master_id,
-                "nonce_timeout_seconds": nonce_timeout}
+                "master_id": master_id, "nonce_timeout_seconds": nonce_timeout}
     if not isinstance(hello, dict) or any(hello.get(key) != value for key, value in expected.items()):
-        raise StateError("helper architecture, compute type, runtime or master identity does not match")
+        raise StateError("helper wire version, architecture, compute type, timeout or master identity does not match")
     if type(hello.get("workers")) is not int or hello["workers"] < workers:
         raise StateError("helper has less capacity than the configured offer")

@@ -36,7 +36,7 @@ def main(argv=None):
             client = Client(config["pool_origin"], os.environ.get("POOL_V2_EXECUTION_TOKEN"))
             from .artifacts import DEFAULT_BINARY_HOSTS
             artifact_hosts = {urlsplit(client.origin).hostname, *config.get("binary_hosts", DEFAULT_BINARY_HOSTS)}
-            runtime = DockerRuntime(directory, config["runtime_images"],
+            runtime = DockerRuntime(directory,
                 binary_hosts=artifact_hosts,
                 nonce_timeout=config.get("nonce_timeout_seconds", 1800),
                 resource_limits=config.get("runtime_limits"))
@@ -45,7 +45,8 @@ def main(argv=None):
             runtime, workers = build_fleet(runtime, store, config)
             runtime.check_resources()
             runner = Runner(client, store, runtime, resource=config["resource"],
-                            compute_type=config["compute_type"], workers=workers)
+                            compute_type=config["compute_type"], workers=workers,
+                            worker_commit=config.get("worker_commit"))
             stop = threading.Event()
             for number in (signal.SIGINT, signal.SIGTERM):
                 signal.signal(number, lambda *_: stop.set())

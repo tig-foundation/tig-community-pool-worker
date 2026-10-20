@@ -11,20 +11,18 @@ log = logging.getLogger("innopool-v2-worker")
 
 
 class RemoteRuntime:
-    def __init__(self, config, *, master_id, resource, compute_type, images,
-                 nonce_timeout, transport=None):
+    def __init__(self, config, *, master_id, resource, compute_type, nonce_timeout, transport=None):
         self.transport = transport or SSHTransport(config)
         self.workers = config["workers"]
         self.master_id, self.resource, self.compute_type = master_id, resource, compute_type
-        self.images, self.nonce_timeout = images, nonce_timeout
+        self.nonce_timeout = nonce_timeout
         self.saved = None
 
     def check_resources(self):
         self.transport.start()
         hello = self.transport.call("hello", timeout=30)
         check_hello(hello, resource=self.resource, compute_type=self.compute_type,
-                    workers=self.workers, images=self.images, master_id=self.master_id,
-                    nonce_timeout=self.nonce_timeout)
+                    workers=self.workers, master_id=self.master_id, nonce_timeout=self.nonce_timeout)
 
     def prepare(self, assignment, saved, offer):
         self.check_resources()
@@ -86,11 +84,6 @@ class FleetRuntime:
     def check_resources(self):
         for backend in self.backends:
             backend.check_resources()
-
-    def validate_release(self, release):
-        images = release.get('runtime_images')
-        if not isinstance(images, dict) or any(backend.images != images for backend in self.backends):
-            raise StateError('The pool runtime changed; drain existing work and update the master and every helper before requesting new work')
 
     def before_offer(self):
         # Recheck every helper before promising its capacity for another benchmark.
@@ -190,8 +183,8 @@ def build_fleet(local, store, config):
     if len(set(targets)) != len(targets):
         raise StateError("the same helper cannot contribute capacity twice")
     remotes = [RemoteRuntime(row, master_id=config["master_id"], resource=config["resource"],
-               compute_type=config["compute_type"], images=config["runtime_images"],
-               nonce_timeout=config.get("nonce_timeout_seconds", 1800)) for row in config["helpers"]]
+               compute_type=config["compute_type"], nonce_timeout=config.get("nonce_timeout_seconds", 1800))
+               for row in config["helpers"]]
     fleet = FleetRuntime(local, store, local_workers=config.get("workers", 1), remotes=remotes,
                          resource=config["resource"], compute_type=config["compute_type"])
     return fleet, fleet.workers

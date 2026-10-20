@@ -1,10 +1,13 @@
 # Whole-benchmark member worker
 
-Before a new offer, an unlinked saved offer or a queued-offer refresh, the worker
-checks the pool's release digest and compares every configured backend against
-the published runtime map. A mismatch stops new work and requires an explicit
-drained update of the master and helpers; already handed-over work can still
-drain and saved evidence is preserved.
+Before a new offer, an unlinked saved offer or a queued-offer refresh, an
+installed worker checks the pool's release digest and that the pool still pairs
+the worker commit it installed (`worker_commit` in its configuration). A
+different pair stops new work and requires an explicit drained update of the
+master and helpers; already handed-over work can still drain and saved evidence
+is preserved. Runtime images are not compared: the pool pins each challenge's
+official image and names it inside every assignment, so a newly offered
+challenge needs no update.
 
 `worker_v2` implements member API version `2.0`. It owns one entire benchmark at a time. Members may run their
 own compatible clients or multiple installations; the pool enforces the shared
@@ -44,7 +47,7 @@ settlement and any pending evidence requests.
 1. Offer exactly CPU or GPU, a compatible TIG verification compute type and
    worker capacity. Save a unique request key before contacting the pool.
 2. Save the complete assignment's exact serialized bytes and verify their
-   SHA-256. Validate the resource and pinned runtime configuration.
+   SHA-256. Validate the resource and the pinned runtime image the assignment names.
 3. Acknowledge the benchmark ID and digest. Start computation only after the
    pool confirms a durable handover timestamp, including recovery by GET when
    an acknowledgement response was lost.
@@ -76,16 +79,16 @@ member funds and is not a TIG API key or wallet signing key.
 
 The JSON configuration requires `pool_origin` (HTTPS), `data_directory`
 (separate from any other installation), `resource` (`CPU` or `GPU`), `compute_type`,
-`workers` and `runtime_images` (challenge ID to exact image reference). Supported
+`workers`, plus `worker_commit`, which the installer writes. Supported
 verification types are `aws_t3`, `aws_t3a`, `aws_t4g`, `aws_c7i`, `aws_c7a`,
 `aws_c7g`, `aws_m7i`, `aws_m7a`, `aws_m7g`, and GPU `aws_g4dn`. ARM types require
 an ARM host; the other types require AMD64. Use a CPU verification type with
 CPU requests and `aws_g4dn` with GPU requests.
 
-Each runtime image must have the form
+Each assignment names the image to run as `runtime_image`, which must have the form
 `ghcr.io/tig-foundation/tig-monorepo/<challenge-name>/runtime@sha256:<digest>`.
-Moving tags are rejected. The pool's deployed release manifest supplies
-the verified runtime digests for its supported challenges. Optional settings are
+Moving tags are rejected. The pool pins these digests from the registry and
+lists the current ones in its served release. Optional settings are
 `binary_hosts` (default `mainnet-api.tig.foundation` and
 `media.githubusercontent.com`) and
 `nonce_timeout_seconds` (default 1800).
