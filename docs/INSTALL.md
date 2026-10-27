@@ -85,6 +85,19 @@ be retried with `update`; a partially activated configuration fails closed and
 the explicit retry completes activation. It never falls back to an upstream
 reset or deletes evidence to make an upgrade proceed.
 
+Two refusals seen in practice, and what they mean:
+
+- `saved work is unfinished; drain it using the installed release before
+  updating`: the worker's last request has no terminal state from the pool yet,
+  for example because the pool is still reconciling a results submission that
+  TIG never confirmed. Start the installed release again and wait; the pool's
+  reconciliation rules end such work from archived block data, the worker then
+  finishes the request on its own, and the update can proceed. Do not edit the
+  evidence database to force it.
+- `installation command failed: git`: the worker tag recorded in the manifest
+  could not be fetched from the repository the manifest names. The pool
+  operator has to publish the tag there; nothing on the member machine fixes it.
+
 `scripts/start-fresh.sh /absolute/installation/directory` invokes this pinned
 launcher. It has no image-pull, Git-update, container-recreation or
 system-service installation behavior. Give any locally configured supervisor
