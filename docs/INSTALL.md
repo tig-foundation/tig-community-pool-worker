@@ -41,6 +41,14 @@ the worker commit in `worker.json`; the running worker refuses new work once
 the pool pairs a different worker release. An existing destination is refused unless an explicit
 update verifies its ownership marker and checkout identity.
 
+The expected repositories are `tig-foundation/tig-community-pool` and
+`tig-foundation/tig-community-pool-worker`. Installations made before the move
+recorded the former `Daniel-T-S-Adams/community-pool` and
+`Daniel-T-S-Adams/community-pool-worker` addresses. An update still accepts
+that record, fetches the new release from `tig-foundation` and records the new
+address, so one drained update moves a member over. A release served by the
+pool must name the `tig-foundation` addresses.
+
 Each installation has its own private directory:
 
 | Path | Purpose |
@@ -113,8 +121,8 @@ same canonical JSON SHA-256 as `release_digest`, plus `pool_commit`.
 {
   "manifest_version": 1,
   "api_version": "2.0",
-  "pool": {"repository": "https://github.com/Daniel-T-S-Adams/community-pool.git", "commit": "<40 hex characters>", "tag": "<tested pool tag>"},
-  "worker": {"repository": "https://github.com/Daniel-T-S-Adams/community-pool-worker.git", "commit": "<40 hex characters>", "tag": "<tested worker tag>", "state_version": 1, "installer_sha256": "<64 hex characters>"},
+  "pool": {"repository": "https://github.com/tig-foundation/tig-community-pool.git", "commit": "<40 hex characters>", "tag": "<tested pool tag>"},
+  "worker": {"repository": "https://github.com/tig-foundation/tig-community-pool-worker.git", "commit": "<40 hex characters>", "tag": "<tested worker tag>", "state_version": 1, "installer_sha256": "<64 hex characters>"},
   "runtime_version": "0.0.8",
   "runtime_images": {"c001": "ghcr.io/tig-foundation/tig-monorepo/satisfiability/runtime@sha256:<64 hex characters>"}
 }

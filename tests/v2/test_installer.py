@@ -128,6 +128,30 @@ print('fixture-revision='''+name+'''')
         self.assertTrue((self.root/'releases'/self.first['commit']).is_dir())
         self.assertEqual(self.run_worker().stdout.strip(),'fixture-revision=two')
 
+    def test_update_moves_an_installation_recorded_under_the_former_repository(self):
+        # The former repository serves the same tags; a member installed from it before the move.
+        former=self.base/'former-repository'
+        subprocess.run(['git','clone','--quiet','--mirror',str(self.repo),str(former)],check=True,capture_output=True)
+        addresses=patch.dict(installer.FORMER_REPOSITORIES,{'worker':str(former)});addresses.start();self.addCleanup(addresses.stop)
+        with patch.object(installer,'WORKER_REPOSITORY',str(former)):
+            self.install(self.manifest({**self.first,'repository':str(former)}))
+        old=self.root/'releases'/self.first['commit']/'code'
+        self.assertEqual(subprocess.run(['git','remote','get-url','origin'],cwd=old,capture_output=True,text=True).stdout.strip(),str(former))
+        # A release served now must name the current repository, never the former one.
+        with self.assertRaisesRegex(installer.InstallError,'repository'):
+            installer.install(self.root,'https://pool.example',self.manifest({**self.second,'repository':str(former)}),update=True)
+        installer.install(self.root,'https://pool.example',self.manifest(self.second),update=True)
+        record=installer.read_installation(self.root)
+        self.assertEqual((record['worker_commit'],record['manifest']['worker']['repository']),(self.second['commit'],str(self.repo)))
+        new=self.root/'releases'/self.second['commit']/'code'
+        self.assertEqual(subprocess.run(['git','remote','get-url','origin'],cwd=new,capture_output=True,text=True).stdout.strip(),str(self.repo))
+        self.assertEqual(self.run_worker().stdout.strip(),'fixture-revision=two')
+        # Only the named former address is accepted in a record; any other repository is still refused.
+        recorded=json.loads((self.root/installer.MARKER).read_text())['manifest']
+        stranger=deepcopy(recorded);stranger['worker']['repository']='https://github.com/example/other-worker.git'
+        with self.assertRaises(installer.InstallError):installer.validate_manifest(stranger,recorded=True)
+        installer.validate_manifest({**recorded,'worker':{**recorded['worker'],'repository':str(former)}},recorded=True)
+
     def test_running_launcher_blocks_upgrade_until_a_drain_finishes(self):
         self.install()
         process=subprocess.Popen([str(self.root/'run'),'--hold'],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,

@@ -20,8 +20,13 @@ from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler,Request,build_opener
 
 
-WORKER_REPOSITORY='https://github.com/Daniel-T-S-Adams/community-pool-worker.git'
-POOL_REPOSITORY='https://github.com/Daniel-T-S-Adams/community-pool.git'
+WORKER_REPOSITORY='https://github.com/tig-foundation/tig-community-pool-worker.git'
+POOL_REPOSITORY='https://github.com/tig-foundation/tig-community-pool.git'
+# Installations made before the repositories moved to tig-foundation recorded
+# these addresses. An update still reads such a record, but installs only from
+# the addresses above, so one update moves the member to the new repository.
+FORMER_REPOSITORIES={'pool':'https://github.com/Daniel-T-S-Adams/community-pool.git',
+    'worker':'https://github.com/Daniel-T-S-Adams/community-pool-worker.git'}
 MARKER='installation-v2.json'
 VERSION='2.0'
 
@@ -50,12 +55,14 @@ def fetch(pool,path):
     return json.loads(raw)
 
 
-def validate_manifest(value):
+def validate_manifest(value,*,recorded=False):
+    """Check a release; recorded=True reads an existing installation's record, which may name a former repository."""
     if not isinstance(value,dict) or type(value.get('manifest_version')) is not int or value.get('manifest_version')!=1 or value.get('api_version')!=VERSION:
         raise InstallError('unsupported paired release manifest')
     for key,expected in (('pool',POOL_REPOSITORY),('worker',WORKER_REPOSITORY)):
         release=value[key]
-        if (release['repository']!=expected or not re.fullmatch(r'[0-9a-f]{40}',release['commit'])
+        allowed=(expected,FORMER_REPOSITORIES[key]) if recorded else (expected,)
+        if (release['repository'] not in allowed or not re.fullmatch(r'[0-9a-f]{40}',release['commit'])
                 or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,63}',release['tag'])):
             raise InstallError('release repository, full commit or tag is invalid')
     if type(value['worker'].get('state_version')) is not int or value['worker'].get('state_version')!=1:raise InstallError('incompatible worker evidence format')
@@ -130,7 +137,7 @@ def read_installation(root):
     if any((root/name).is_symlink() for name in ('data','releases','worker.json','execution-token','installation.lock')):
         raise InstallError('owned installation paths cannot redirect to another directory')
     if marker.get('worker_commit'):
-        manifest=validate_manifest(marker['manifest'])
+        manifest=validate_manifest(marker['manifest'],recorded=True)
         if marker['worker_commit']!=manifest['worker']['commit'] or marker['release_digest']!=hashlib.sha256(canonical(manifest).encode()).hexdigest():
             raise InstallError('recorded release identity changed')
     return marker
